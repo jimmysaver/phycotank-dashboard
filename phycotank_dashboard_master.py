@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
+from datetime import datetime
 
 # Load the data
 @st.cache_data
@@ -10,11 +11,20 @@ def load_data():
 
 df = load_data()
 
-# Sidebar for tank selection
-st.sidebar.title("Phycotank Selector")
+# Sidebar layout
+st.sidebar.image("nellie_carbon_capture_chip_logo_white.png", use_column_width=True)
+st.sidebar.markdown("### Nellie Mwyndy Cross PhycoTank Array")
+
 tank_options = ["Aggregate"] + sorted(df["phycotank_id"].unique())
 selected_option = st.sidebar.selectbox("Select a phycotank", tank_options)
 
+st.sidebar.markdown("Data ingested from Nellie Mwyndy Cross CDR Installation", help=None)
+st.sidebar.markdown(f"**{datetime.now().strftime('%A, %d %B %Y, %H:%M:%S')}**", help="Browser local time")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown(f"© Nellie Technologies Ltd. {datetime.now().year}. All rights reserved.")
+
+# Main content
 st.title("Phycotank Monitoring Dashboard")
 
 if selected_option == "Aggregate":
