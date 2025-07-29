@@ -12,7 +12,7 @@ def load_data():
 df = load_data()
 
 # Sidebar layout
-st.sidebar.image("nellie_carbon_capture_chip_logo_white.png", use_column_width=True)
+st.sidebar.image("nellie_carbon_capture_chip_logo_white.png", use_container_width=True)
 st.sidebar.markdown("### Nellie Mwyndy Cross PhycoTank Array")
 
 tank_options = ["Aggregate"] + sorted(df["phycotank_id"].unique())
