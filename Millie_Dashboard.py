@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from streamlit_autorefresh import st_autorefresh
 
 # Auto-refresh every 60 seconds
@@ -23,10 +24,10 @@ tank_options = ["Aggregate"] + sorted(df["phycotank_id"].unique())
 selected_option = st.sidebar.selectbox("Select a phycotank", tank_options)
 
 st.sidebar.markdown("Data ingested from Nellie Mwyndy Cross CDR Installation")
-st.sidebar.markdown(f"**{datetime.now().strftime('%A, %d %B %Y, %H:%M:%S')}**")
+st.sidebar.markdown(f"**{datetime.now(ZoneInfo('Europe/London')).strftime('%A, %d %B %Y, %H:%M:%S')}**")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown(f"© Nellie Technologies Ltd. {datetime.now().year}. All rights reserved.")
+st.sidebar.markdown(f"© Nellie Technologies Ltd. {datetime.now(ZoneInfo('Europe/London')).year}. All rights reserved.")
 
 # Main dashboard
 st.title("Phycotank Monitoring Dashboard")
