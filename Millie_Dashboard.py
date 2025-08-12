@@ -1,12 +1,11 @@
-
 import streamlit as st
 import pandas as pd
 import altair as alt
 from datetime import datetime
+from streamlit_autorefresh import st_autorefresh
 
 # Auto-refresh every 60 seconds
-st_autorefresh = st.experimental_rerun
-st_autorefresh = st.autorefresh(interval=60 * 1000, key="refresh")
+st_autorefresh(interval=60 * 1000, key="data_refresh")
 
 # Load the data
 @st.cache_data
