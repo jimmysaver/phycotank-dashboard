@@ -12,6 +12,44 @@ st_autorefresh(interval=60 * 1000, key="main_refresh")
 tz = pytz.timezone("Europe/London")
 current_time = datetime.now(tz).strftime('%A, %d %B %Y, %H:%M:%S')
 
+import os
+
+# Nellie.py
+import streamlit as st
+from sidebar import show_sidebar
+
+st.set_page_config(page_title="Nellie CDR Dashboard", layout="wide")
+
+# Show the sidebar
+show_sidebar()
+
+st.title("Nellie Carbon Dioxide Removal System")
+
+st.markdown("""
+Welcome to the Nellie CDR Platform — view live metrics and insights
+for the full carbon removal lifecycle:
+- **Phycotanks**
+- **Biomass Dehydration**
+- **Pyrolysis & Biochar**
+- **Sequestration Sites**
+""")
+
+# Navigation (Streamlit's multipage feature)
+st.markdown("Use the sidebar to navigate between dashboards.")
+
+# Try assets folder first, then root directory
+logo_paths = [
+    "assets/nellie_carbon_capture_chip_logo_white.png",
+    "nellie_carbon_capture_chip_logo_white.png"
+]
+
+logo_path = next((path for path in logo_paths if os.path.exists(path)), None)
+
+if logo_path:
+    st.sidebar.image(logo_path, use_container_width=True)
+else:
+    st.sidebar.warning("Logo not found")
+
 # --- SIDEBAR ---
 st.sidebar.image("assets/nellie_carbon_capture_chip_logo_white.png", use_container_width=True)
 st.sidebar.markdown("### Millie Platform — CDR Command Centre")
