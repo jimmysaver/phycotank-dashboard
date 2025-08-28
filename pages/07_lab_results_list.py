@@ -85,7 +85,7 @@ def build_pdf(sheets: dict[str, pd.DataFrame], title: str) -> bytes:
             story.append(PageBreak())
 
     # --- Footer function ---
-    logo_path = "assets/nellie_carbon_capture_chip_logo_white.png"
+    logo_path = "assets/nellie_wordmark.png"
 
     def add_footer(c: canvas.Canvas, doc):
         width, height = landscape(A4)
