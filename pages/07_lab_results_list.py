@@ -10,7 +10,7 @@ import streamlit as st
 
 # PDF generation (pure Python)
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
@@ -58,11 +58,11 @@ def build_pdf(sheets: dict[str, pd.DataFrame], title: str) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
-        pagesize=landscape(A4),
+        pagesize=A4,  # portrait
         leftMargin=12 * mm,
         rightMargin=12 * mm,
         topMargin=10 * mm,
-        bottomMargin=15 * mm,  # leave space for footer
+        bottomMargin=15 * mm,
     )
     styles = getSampleStyleSheet()
     story = []
@@ -88,17 +88,11 @@ def build_pdf(sheets: dict[str, pd.DataFrame], title: str) -> bytes:
     logo_path = "assets/nellie_wordmark.png"
 
     def add_footer(c: canvas.Canvas, doc):
-        width, height = landscape(A4)
+        width, height = A4
         y = 8 * mm
         x = 12 * mm
 
-        # Logo (if available)
-        if os.path.exists(logo_path):
-            logo = ImageReader(logo_path)
-            c.drawImage(logo, x, y, width=200, preserveAspectRatio=True, mask="auto")
-            x += 35  # shift text right
-
-        # Contact + disclaimer
+        # Contact + disclaimer (on all pages)
         footer_text = (
             "admin@nellie.tech  |  The information contained is private and confidential. "
             "All rights reserved."
@@ -106,7 +100,18 @@ def build_pdf(sheets: dict[str, pd.DataFrame], title: str) -> bytes:
         c.setFont("Helvetica", 7)
         c.drawString(x, y + 5, footer_text)
 
-    # Build with footer on every page
+        # Logo only on last page, left aligned
+        if doc.page == doc.pageCount and os.path.exists(logo_path):
+            logo = ImageReader(logo_path)
+            c.drawImage(
+                logo,
+                x,  # left margin
+                y + 12,  # a little above footer text
+                width=60 * mm,  # ~60 mm wide
+                preserveAspectRatio=True,
+                mask="auto",
+            )
+
     doc.build(story, onFirstPage=add_footer, onLaterPages=add_footer)
     return buffer.getvalue()
 
@@ -147,7 +152,6 @@ elif use_default:
         st.stop()
     file_to_open = default_file
 
-# Optional debug to verify paths on Cloud
 with st.expander("Debug (paths)", expanded=False):
     st.write("cwd:", os.getcwd())
     st.write("data/ exists:", os.path.isdir("data"))
