@@ -95,7 +95,7 @@ def build_pdf(sheets: dict[str, pd.DataFrame], title: str) -> bytes:
         # Logo (if available)
         if os.path.exists(logo_path):
             logo = ImageReader(logo_path)
-            c.drawImage(logo, x, y, width=25, preserveAspectRatio=True, mask="auto")
+            c.drawImage(logo, x, y, width=200, preserveAspectRatio=True, mask="auto")
             x += 35  # shift text right
 
         # Contact + disclaimer
