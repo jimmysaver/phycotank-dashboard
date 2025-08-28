@@ -14,6 +14,8 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
 
 st.set_page_config(page_title="Lab Results (List)", layout="wide")
 st.title("Lab Results (List)")
@@ -60,7 +62,7 @@ def build_pdf(sheets: dict[str, pd.DataFrame], title: str) -> bytes:
         leftMargin=12 * mm,
         rightMargin=12 * mm,
         topMargin=10 * mm,
-        bottomMargin=10 * mm,
+        bottomMargin=15 * mm,  # leave space for footer
     )
     styles = getSampleStyleSheet()
     story = []
@@ -82,16 +84,33 @@ def build_pdf(sheets: dict[str, pd.DataFrame], title: str) -> bytes:
         if i < len(sheet_names):
             story.append(PageBreak())
 
-    doc.build(story)
+    # --- Footer function ---
+    logo_path = "assets/nellie_carbon_capture_chip_logo_white.png"
+
+    def add_footer(c: canvas.Canvas, doc):
+        width, height = landscape(A4)
+        y = 8 * mm
+        x = 12 * mm
+
+        # Logo (if available)
+        if os.path.exists(logo_path):
+            logo = ImageReader(logo_path)
+            c.drawImage(logo, x, y, width=25, preserveAspectRatio=True, mask="auto")
+            x += 35  # shift text right
+
+        # Contact + disclaimer
+        footer_text = (
+            "admin@nellie.tech  |  The information contained is private and confidential. "
+            "All rights reserved."
+        )
+        c.setFont("Helvetica", 7)
+        c.drawString(x, y + 5, footer_text)
+
+    # Build with footer on every page
+    doc.build(story, onFirstPage=add_footer, onLaterPages=add_footer)
     return buffer.getvalue()
 
 def extract_sample_id(sheets: dict[str, pd.DataFrame]) -> str | None:
-    """
-    Try to find the Sample ID in any sheet:
-    - When the sheet uses long/tidy format with columns ['Field','Value'] and a row 'Field'=='Sample ID'
-    - Be tolerant of case/spacing: 'sample id', 'Sample_ID', 'SampleID'
-    Returns the sample id string or None if not found.
-    """
     possible_field_cols = {"field", "parameter", "name"}
     possible_value_cols = {"value", "result", "data"}
 
@@ -100,7 +119,6 @@ def extract_sample_id(sheets: dict[str, pd.DataFrame]) -> str | None:
         field_col = next((cols_lower[c] for c in cols_lower if c in possible_field_cols), None)
         value_col = next((cols_lower[c] for c in cols_lower if c in possible_value_cols), None)
         if field_col and value_col:
-            # normalize field strings
             fields = df[field_col].astype(str).str.strip().str.lower().str.replace(r"[_\s]+", " ", regex=True)
             mask = fields.isin(["sample id", "sampleid", "sample id:"])
             if mask.any():
@@ -125,10 +143,7 @@ if uploaded is not None:
 elif use_default:
     default_file = "data/lab_results/TP_EXAMPLE.xlsx"
     if not os.path.exists(default_file):
-        st.error(
-            f"Default file not found at: {default_file}. "
-            "Make sure it exists in your repo (data/lab_results/)."
-        )
+        st.error(f"Default file not found at: {default_file}. Make sure it exists in your repo (data/lab_results/).")
         st.stop()
     file_to_open = default_file
 
@@ -167,7 +182,7 @@ st.markdown("---")
 # ---------- Downloads ----------
 col_d1, col_d2 = st.columns(2)
 
-# Excel download (keep simple: uploaded name if uploaded; default name otherwise)
+# Excel download
 with col_d1:
     if uploaded is not None:
         st.download_button(
@@ -182,7 +197,7 @@ with col_d1:
                 st.download_button(
                     label="Download original Excel",
                     data=f.read(),
-                    file_name="TP_EXAMPLE.xlsx",  # keep a stable name for the default
+                    file_name="TP_EXAMPLE.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
         except Exception:
@@ -191,7 +206,6 @@ with col_d1:
 # PDF download — filename = Sample ID (if found), else fallback
 with col_d2:
     try:
-        # Determine PDF filename from Sample ID
         sample_id = extract_sample_id(sheets)
         pdf_filename = f"{sample_id}.pdf" if sample_id else "Lab_Results_Summary.pdf"
 
@@ -199,7 +213,7 @@ with col_d2:
         st.download_button(
             label="Download as PDF",
             data=pdf_bytes,
-            file_name=pdf_filename,  # ✅ dynamic filename from Sample ID
+            file_name=pdf_filename,
             mime="application/pdf",
         )
     except Exception as e:
