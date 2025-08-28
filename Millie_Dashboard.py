@@ -1,4 +1,10 @@
+from utils.sidebar import show_sidebar
+show_sidebar()
+
+
 # trigger deployment
+
+
 import streamlit as st
 import pandas as pd
 import altair as alt

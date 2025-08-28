@@ -1,4 +1,8 @@
 # pages/1_Phycotank_Array.py
+
+from utils.sidebar import show_sidebar
+show_sidebar()
+
 import streamlit as st
 import pandas as pd
 import altair as alt
