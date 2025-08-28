@@ -102,11 +102,11 @@ file_to_open = None
 if uploaded is not None:
     file_to_open = uploaded
 elif use_default:
-    # Put your example file here in your repo: data/Celignis_Sample_3344_Analysis_Summary.xlsx
+    # Default lab results folder
     try:
-        file_to_open = "data/Celignis_Sample_3344_Analysis_Summary.xlsx"
+        file_to_open = "data/lab_results/Celignis_Sample_3344_Analysis_Summary.xlsx"
     except Exception:
-        st.warning("Default file not found. Upload an Excel to continue.")
+        st.warning("Default lab results file not found. Upload an Excel to continue.")
 
 if not file_to_open:
     st.stop()
