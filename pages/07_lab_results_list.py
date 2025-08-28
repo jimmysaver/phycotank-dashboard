@@ -1,4 +1,5 @@
 import io
+import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -14,7 +15,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 
 st.set_page_config(page_title="Lab Results (List)", layout="wide")
 st.title("Lab Results (List)")
-
 st.caption("Upload a Celignis (or other) Excel file to preview nicely and export a polished PDF.")
 
 # --- Helper: read Excel into dict of DataFrames ---
@@ -25,20 +25,17 @@ def read_excel(file) -> dict[str, pd.DataFrame]:
         df = xls.parse(name)
         # ensure simple, readable dtypes
         for col in df.select_dtypes(include=["float", "int"]).columns:
-            # Avoid excessive decimals by rounding
             df[col] = pd.to_numeric(df[col], errors="coerce")
         sheets[name] = df
     return sheets
 
 # --- Helper: DataFrame -> ReportLab Table data (+basic formatting) ---
 def df_to_table_block(df: pd.DataFrame, max_rows_for_pdf: int = 60):
-    # Convert to list-of-lists with header row
     header = [str(c) for c in df.columns]
     body_rows = df.head(max_rows_for_pdf).fillna("").astype(str).values.tolist()
     data = [header] + body_rows
 
     tbl = Table(data, repeatRows=1)
-    # Base style
     style = TableStyle([
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 8),
@@ -58,7 +55,6 @@ def df_to_table_block(df: pd.DataFrame, max_rows_for_pdf: int = 60):
 # --- Helper: build PDF (bytes) from many sheets ---
 def build_pdf(sheets: dict[str, pd.DataFrame], title: str) -> bytes:
     buffer = io.BytesIO()
-    # Landscape A4 helps wide tables
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
@@ -71,20 +67,20 @@ def build_pdf(sheets: dict[str, pd.DataFrame], title: str) -> bytes:
     story = []
 
     now_uk = datetime.now(ZoneInfo("Europe/London")).strftime("%A, %d %B %Y, %H:%M:%S")
-    header = Paragraph(f"<b>{title}</b>", styles["Title"])
-    sub = Paragraph(f"Generated: {now_uk}", styles["Normal"])
+    story += [
+        Paragraph(f"<b>{title}</b>", styles["Title"]),
+        Spacer(1, 4),
+        Paragraph(f"Generated: {now_uk}", styles["Normal"]),
+        Spacer(1, 8),
+    ]
 
-    story += [header, Spacer(1, 4), sub, Spacer(1, 8)]
-
-    sheet_count = len(sheets)
-    for i, (sheet_name, df) in enumerate(sheets.items(), start=1):
+    sheet_names = list(sheets.keys())
+    for i, sheet_name in enumerate(sheet_names, start=1):
+        df = sheets[sheet_name]
         story.append(Paragraph(f"<b>Sheet:</b> {sheet_name}", styles["Heading3"]))
         story.append(Spacer(1, 4))
-        if df.empty:
-            story.append(Paragraph("<i>(No rows)</i>", styles["Normal"]))
-        else:
-            story.append(df_to_table_block(df))
-        if i < sheet_count:
+        story.append(Paragraph("<i>(No rows)</i>", styles["Normal"]) if df.empty else df_to_table_block(df))
+        if i < len(sheet_names):
             story.append(PageBreak())
 
     doc.build(story)
@@ -95,18 +91,35 @@ col_u1, col_u2 = st.columns([2, 1])
 with col_u1:
     uploaded = st.file_uploader("Upload lab results Excel (.xlsx)", type=["xlsx"], accept_multiple_files=False)
 with col_u2:
-    use_default = st.toggle("Use default example", value=(uploaded is None), help="Loads data/Celignis_Sample_3344_Analysis_Summary.xlsx")
+    use_default = st.toggle(
+        "Use default example",
+        value=(uploaded is None),
+        help="Loads data/lab_results/Celignis_Sample_3344_Analysis_Summary.xlsx",
+    )
 
 # Determine file source
 file_to_open = None
 if uploaded is not None:
     file_to_open = uploaded
 elif use_default:
-    # Default lab results folder
+    default_file = "data/lab_results/TP_EXAMPLE.xlsx"
+    if not os.path.exists(default_file):
+        st.error(
+            f"Default file not found at: {default_file}. "
+            "Make sure it exists in your repo (data/lab_results/)."
+        )
+        st.stop()
+    file_to_open = default_file
+
+# Optional: debug what the server sees
+with st.expander("Debug (paths)", expanded=False):
+    st.write("cwd:", os.getcwd())
+    st.write("data/ exists:", os.path.isdir("data"))
+    st.write("data/lab_results/ exists:", os.path.isdir("data/lab_results"))
     try:
-        file_to_open = "data/lab_results/Celignis_Sample_3344_Analysis_Summary.xlsx"
-    except Exception:
-        st.warning("Default lab results file not found. Upload an Excel to continue.")
+        st.write("data/lab_results contents:", os.listdir("data/lab_results"))
+    except Exception as e:
+        st.write("listdir error:", e)
 
 if not file_to_open:
     st.stop()
@@ -122,17 +135,11 @@ if not sheets:
     st.warning("No sheets found in the workbook.")
     st.stop()
 
-tab_labels = list(sheets.keys())
-tabs = st.tabs(tab_labels)
-
-for tab, name in zip(tabs, tab_labels):
+tabs = st.tabs(list(sheets.keys()))
+for tab, name in zip(tabs, sheets.keys()):
     with tab:
-        df = sheets[name]
-
-        # Smart formatting: freeze first few columns if typical 'Sample'/'Parameter'
         st.subheader(name)
-        # Show shaped dataframe (Streamlit handles large tables well)
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(sheets[name], use_container_width=True)
 
 st.markdown("---")
 
@@ -152,7 +159,7 @@ with col_d1:
                 st.download_button(
                     label="Download original Excel",
                     data=f.read(),
-                    file_name="Celignis_Sample_3344_Analysis_Summary.xlsx",
+                    file_name=os.path.basename(file_to_open),
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
         except Exception:
