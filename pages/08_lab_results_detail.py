@@ -20,6 +20,14 @@ from reportlab.lib.utils import ImageReader
 st.set_page_config(page_title="Lab Results (Detail)", layout="wide")
 st.title("Lab Results (Detail)")
 
+# ---- Back to list ----
+back_col, _ = st.columns([1, 5])
+with back_col:
+    if st.button("← Back to Lab Results (List)", use_container_width=True):
+        # Clear selection (optional) then go back
+        st.session_state.pop("lab_file", None)
+        st.switch_page("pages/07_lab_results_list.py")
+
 LAB_DIR = "data/lab_results"
 
 # ---------- Helpers ----------
@@ -154,7 +162,6 @@ def extract_sample_id(sheets: dict[str, pd.DataFrame]) -> str | None:
 file_to_open = st.session_state.get("lab_file")
 
 if not file_to_open:
-    # Fallback: allow a quick selection if user navigated here directly
     st.info("No file selected. Choose a workbook from the list below.")
     if not os.path.isdir(LAB_DIR):
         st.stop()
@@ -182,4 +189,39 @@ if not sheets:
 tabs = st.tabs(list(sheets.keys()))
 for tab, name in zip(tabs, sheets.keys()):
     with tab:
-       
+        st.subheader(name)
+        st.dataframe(sheets[name], use_container_width=True)
+
+st.markdown("---")
+
+# ---------- Downloads ----------
+col_d1, col_d2 = st.columns(2)
+
+# Excel download
+with col_d1:
+    try:
+        with open(file_to_open, "rb") as f:
+            st.download_button(
+                label="Download original Excel",
+                data=f.read(),
+                file_name=os.path.basename(file_to_open),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+    except Exception:
+        st.warning("Original Excel file not found for download.")
+
+# PDF download — filename = Sample ID (if found), else fallback
+with col_d2:
+    try:
+        sample_id = extract_sample_id(sheets)
+        pdf_filename = f"{sample_id}.pdf" if sample_id else "Lab_Results_Summary.pdf"
+
+        pdf_bytes = build_pdf(sheets, title="Lab Results Summary")
+        st.download_button(
+            label="Download as PDF",
+            data=pdf_bytes,
+            file_name=pdf_filename,
+            mime="application/pdf",
+        )
+    except Exception as e:
+        st.error(f"Could not generate PDF: {e}")
