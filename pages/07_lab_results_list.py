@@ -55,14 +55,66 @@ def df_to_table_block(df: pd.DataFrame, max_rows_for_pdf: int = 60):
     return tbl
 
 def build_pdf(sheets: dict[str, pd.DataFrame], title: str) -> bytes:
+    """
+    Build a portrait A4 PDF.
+    Footer (email + disclaimer) appears on every page.
+    The logo (assets/nellie_wordmark.png) appears only on the last page, left-aligned.
+    """
     buffer = io.BytesIO()
+
+    # --- Custom canvas to know total page count and draw footer/logo accordingly ---
+    class NumberedCanvas(canvas.Canvas):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._saved_page_states = []
+
+        def showPage(self):
+            self._saved_page_states.append(dict(self.__dict__))
+            self._startPage()
+
+        def save(self):
+            num_pages = len(self._saved_page_states)
+            for state in self._saved_page_states:
+                self.__dict__.update(state)
+                self.draw_page_footer(num_pages)
+                super().showPage()
+            super().save()
+
+        def draw_page_footer(self, num_pages: int):
+            width, height = A4
+            y = 8 * mm
+            x = 12 * mm
+
+            # Contact + disclaimer on all pages
+            footer_text = (
+                "admin@nellie.tech  |  The information contained is private and confidential. "
+                "All rights reserved."
+            )
+            self.setFont("Helvetica", 7)
+            self.drawString(x, y + 5, footer_text)
+
+            # Logo only on the last page (left aligned)
+            if self._pageNumber == num_pages:
+                logo_path = "assets/nellie_wordmark.png"
+                if os.path.exists(logo_path):
+                    logo = ImageReader(logo_path)
+                    self.drawImage(
+                        logo,
+                        x,          # left margin
+                        y + 12,     # a little above footer text
+                        width=60 * mm,  # ~60 mm wide
+                        preserveAspectRatio=True,
+                        mask="auto",
+                    )
+
+    # --- Build story ---
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,  # portrait
         leftMargin=12 * mm,
         rightMargin=12 * mm,
         topMargin=10 * mm,
-        bottomMargin=15 * mm,
+        bottomMargin=18 * mm,  # room for footer
     )
     styles = getSampleStyleSheet()
     story = []
@@ -84,38 +136,15 @@ def build_pdf(sheets: dict[str, pd.DataFrame], title: str) -> bytes:
         if i < len(sheet_names):
             story.append(PageBreak())
 
-    # --- Footer function ---
-    logo_path = "assets/nellie_wordmark.png"
-
-    def add_footer(c: canvas.Canvas, doc):
-        width, height = A4
-        y = 8 * mm
-        x = 12 * mm
-
-        # Contact + disclaimer (on all pages)
-        footer_text = (
-            "admin@nellie.tech  |  The information contained is private and confidential. "
-            "All rights reserved."
-        )
-        c.setFont("Helvetica", 7)
-        c.drawString(x, y + 5, footer_text)
-
-        # Logo only on last page, left aligned
-        if doc.page == doc.pageCount and os.path.exists(logo_path):
-            logo = ImageReader(logo_path)
-            c.drawImage(
-                logo,
-                x,  # left margin
-                y + 12,  # a little above footer text
-                width=60 * mm,  # ~60 mm wide
-                preserveAspectRatio=True,
-                mask="auto",
-            )
-
-    doc.build(story, onFirstPage=add_footer, onLaterPages=add_footer)
+    # Build using our custom canvas (so we can draw last-page logo)
+    doc.build(story, canvasmaker=NumberedCanvas)
     return buffer.getvalue()
 
 def extract_sample_id(sheets: dict[str, pd.DataFrame]) -> str | None:
+    """
+    Find Sample ID in any sheet where there are 'Field' and 'Value' columns.
+    Tolerant of variations like 'parameter'/'name' for field and 'result'/'data' for value.
+    """
     possible_field_cols = {"field", "parameter", "name"}
     possible_value_cols = {"value", "result", "data"}
 
@@ -152,6 +181,7 @@ elif use_default:
         st.stop()
     file_to_open = default_file
 
+# Optional: debug paths on local/Cloud
 with st.expander("Debug (paths)", expanded=False):
     st.write("cwd:", os.getcwd())
     st.write("data/ exists:", os.path.isdir("data"))
